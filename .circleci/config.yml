@@ -1,30 +1,121 @@
 version: 2.1
-jobs: # we now have TWO jobs, so that a workflow can coordinate them!
-  one: # This is our first job.
-    docker: # it uses the docker executor
-      - image: circleci/ruby:2.4.1 # specifically, a docker image with ruby 2.4.1
-        auth:
-          username: mydockerhub-user
-          password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
-    # Steps are a list of commands to run inside the docker container above.
-    steps:
-      - checkout # this pulls code down from GitHub
-      - run: echo "A first hello" # This prints "A first hello" to stdout.
-      - run: sleep 25 # a command telling the job to "sleep" for 25 seconds.
-  two: # This is our second job.
-    docker: # it runs inside a docker image, the same as above.
-      - image: circleci/ruby:2.4.1
-        auth:
-          username: mydockerhub-user
-          password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
+
+orbs:
+  node: circleci/node@1.1
+
+jobs:
+  build:
+    executor:
+      name: node/default
+      tag: '10.4'
     steps:
       - checkout
-      - run: echo "A more familiar hi" # We run a similar echo command to above.
-      - run: sleep 15 # and then sleep for 15 seconds.
-# Under the workflows: map, we can coordinate our two jobs, defined above.
+      - run: echo "Clean compile chrome-engine" # This prints "A first hello" to stdout.
+      - run: sh "npm --no-color --unsafe-perm ci"
+  runUnitTests: # this job requries job 'build'
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+      - run: echo "Run unit tests"
+  runIntegrationTests: # this job requires job 'build' TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Run integration tests"
+  updateRancher: # update rancher config to use the latest image, applicable for both journey and audits TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Updating rancher to use the latest image"
+
+# -------------------------------------
+# ----- Web-journey-specific Jobs -----
+# -------------------------------------
+  storeDockerImageToECR: # TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Registering Docker image to ECR"
+  updateFargate:
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Updating Fartgate config using the latest image on ECR"
+
+# -----------------------------------
+# ----- Web-audit-specific Jobs -----
+# -----------------------------------
+  storeDockerImageToNexus: # TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Registering Docker image to ECR"
+  recordContainerIdInConsole: # TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Recording image id in console"
+  restartBestow: # TODO
+    executor:
+      name: node/default
+      tag: '10.4'
+    steps:
+        - run: echo "Restarting Bestw
+
+# workflows section: typed by each engine usage
 workflows:
-  version: 2
-  one_and_two: # this is the name of our workflow
-    jobs: # and here we list the jobs we are going to run.
-      - one
-      - two
+  version: 2.1 
+  DefaultWorkFlow: # this workflow build the project and run the tests
+    jobs:
+      - build
+      - runUnitTests:
+          requires:
+            - build
+      - runIntegrationTests:
+          requires:
+            - build
+
+  # Optional Work Flows
+  DeployAuditEngineOnProd: # this optional workflow deploys the audit engine
+    jobs: 
+      - build
+      - runUnitTests:
+          requires:
+            - build
+      - runIntegrationTests:
+          requires:
+            - build
+  DeployAuditEngineOnStaging: # this optional workflow deploys the audit engine
+    jobs: 
+      - build
+      - runUnitTests:
+          requires:
+            - build
+      - runIntegrationTests:
+          requires:
+            - build
+  DeployWebJourneyEngineOnProd: # this optional workflow deploys the web journey engine
+    jobs:
+      - build
+      - runUnitTests:
+          requires:
+            - build
+      - runIntegrationTests:
+          requires:
+            - build
+  DeployWebJourneyEngineOnStaging: # this optional workflow deploys the web journey engine
+    jobs:
+      - build
+      - runUnitTests:
+          requires:
+            - build
+      - runIntegrationTests:
+          requires:
+            - build
